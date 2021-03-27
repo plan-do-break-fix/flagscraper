@@ -1,0 +1,74 @@
+---
+version: "3.3"
+
+services:
+  database:
+    image: mysql:5.7
+    container_name: flagscraper-db
+    restart: always
+    environment: 
+      MYSQL_ROOT_PASSWORD: pass
+    networks:
+      flagscraper-net:
+        ipv4_address: 172.18.0.2
+    volumes:
+      - $LOCAL_DATA_PATH/mysql:/var/lib/mysql
+    
+  queue:
+    image: flagscraper-rabbitmq:1.0
+    container_name: flagscraper-q
+    restart: always
+    ports:
+      - 15672:15672
+    networks:
+      flagscraper-net:
+        ipv4_address: 172.18.0.3
+
+  web:
+    image: flagscraper-web_agent:1.0
+    container_name: flagscraper-web
+    restart: always
+    depends_on: 
+      - database
+      - queue
+    environment: 
+      CONTAINER_DATA_PATH: $CONTAINER_DATA_PATH
+      DB_HOST: $DB_HOST
+      DB_USER: $PARSER_DB_LOGIN
+      DB_PASSWD: $PARSER_DB_PASSWD
+      Q_HOST: $Q_HOST
+      Q_LOGIN: $WEB_AGENT_Q_LOGIN
+      Q_PASSWD: $WEB_AGENT_Q_PASSWD
+    networks:
+      - flagscraper-net
+    volumes:
+      - $LOCAL_DATA_PATH:$CONTAINER_DATA_PATH
+      - $LOCAL_DATA_PATH/logs:/var/log/flagscraper
+
+  parser:
+    image: flagscraper-parser:1.0
+    container_name: flagscraper-parser
+    restart: always
+    depends_on: 
+      - database
+      - queue
+    environment:
+      CONTAINER_DATA_PATH: $CONTAINER_DATA_PATH
+      DB_HOST: $DB_HOST
+      DB_USER: $PARSER_DB_LOGIN
+      DB_PASSWD: $PARSER_DB_PASSWD
+      Q_HOST: $Q_HOST
+      Q_LOGIN: $PARSER_Q_LOGIN
+      Q_PASSWD: $PARSER_Q_PASSWD
+    networks:
+      - flagscraper-net
+    volumes:
+      - $LOCAL_DATA_PATH:$CONTAINER_DATA_PATH
+      - $LOCAL_DATA_PATH/logs:/var/log/flagscraper
+
+networks: 
+  flagscraper-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
